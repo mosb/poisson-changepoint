@@ -43,9 +43,9 @@
   \and
   Michael A Osborne\\
   {University of Oxford}\\
-  {Parks Road}\\
   {Oxford OX1 3PJ}\\
   {United Kingdom}\\
+\url{mosb@robots.ox.ac.uk}
   \and
   Richard P Mann\\
   {Uppsala Universitet}\\
@@ -69,7 +69,7 @@
   probabilistic changepoint detection by approximating the posterior
   distribution over putative changepoint locations.  We will also
   approximate the full posterior distribution over the intensity
-  function, marginalizing out the model hyperparamters, in particular
+  function, marginalizing out the model hyperparameters, in particular
   the locations of potential changepoints.  We will analyze two
   real-world datasets using these techniques.
 \end{abstract}
@@ -217,7 +217,7 @@ approximate the likelihood with
 \end{equation*}
 where $m$ is the Lebesgue measure.  This statement agrees with
 \eqref{realprobability}, except that we have approximated $\int_{X_i}
-\lambda$ with $m(X_i) \exp \nu_i$.  This approixmation has been shown
+\lambda$ with $m(X_i) \exp \nu_i$.  This approximation has been shown
 to be consistent as $\max_i m(X_i) \to 0$ \citep{ghosh}.
 
 Many schemes are available for approximating or sampling from the
@@ -230,12 +230,12 @@ algorithm for sampling exactly from the posterior using Markov chain
 Monte Carlo techniques that does not require discretization or other
 approximations.  The tradeoff for these more complicated but
 potentially more accurate methods is a (sometimes substantial)
-increase in computational cost.
+increase in computational cost. Our application requires fast inference because????
 
 Let $\bm{\nu} \deq [\nu_1, \dotsc, \nu_m]^\top$ represent the latent
 log intensities on the partition elements $\lbrace X_i \rbrace$.  In
 the Laplace approximation, we approximate the posterior $p(\bm{\nu}
-\given \data, \theta)$ with a Guassian distribution obtained by taking
+\given \data, \theta)$ with a Gaussian distribution obtained by taking
 a second-order Taylor expansion of the likelihood around its mode.
 Let
 \begin{align*}
@@ -375,7 +375,7 @@ grid with six months separating each point.  Approximately $4.5 \times
 served as ``burn-in'' for the Makov chain to mix.  The posterior
 $p(\nu \given \data)$ was then approximated as a Gaussian process
 mixture of the approximate posterior distributions conditioned on the
-sampled hyperparamter values.
+sampled hyperparameter values.
 
 Figure \ref{coal}\subref{posterior} shows the approximate posterior
 distribution $p(\lambda \given \data)$; the distribution was
@@ -400,7 +400,7 @@ variance of $p(\lambda \given \data)$ is higher in the region from
 1870--1890; this corresponds with our uncertainty in $t_c$ and reflects
 principled Bayesian analysis.  Furthermore, notice that the posterior
 mean prior to the putative changepoint is quite flat.  The
-hyperparamter samples with the highest posterior probability in fact
+hyperparameter samples with the highest posterior probability in fact
 tend to fit the data with an essentially homogeneous Poisson process
 during the region from 1851--1870 (by having a very large $\sigma_1$),
 followed by a nonhomogeneous process with a much smaller $\sigma_2$.
