@@ -28,6 +28,7 @@
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\N}{\mathbb{N}}
 \newcommand{\intd}[1]{\,\mathrm{d}#1}
+\DeclareMathOperator{\diag}{diag}
 
 \DeclareMathOperator{\poisson}{Poisson}
 \DeclareMathOperator*{\argmax}{arg\,max}
@@ -363,7 +364,7 @@ across function values---larger input scales typically indicate more
 long-scale dependence and therefore smoother functions.
 
 Extending the constructions below to the multidimensional case is not
-difficult.  In many applications, the input space will be a single
+difficult \citep{gpml}..  In many applications, the input space will be a single
 temporal dimension, in which case the covariances below can be used
 without modification.
 
@@ -408,7 +409,7 @@ The covariance $K_{\text{CO}}$ is demonstrated in Figure
 
 \begin{figure}
   \centering
-  \psff{changepointcovsamples3} \\
+   \psff{changepointcovsamples3} \\
   \bigskip
   \psff{changepointcov3}\medskip
   \caption{Illustration of the covariance function $K_{\text{CO}}$
@@ -477,40 +478,71 @@ The covariance $K_{\text{CI}}$ is demonstrated in Figure
 \end{figure}
 
 \subsection{A sudden change in correlation}
+% 
+% Let us suppose now that we have two functions of interest,
+% $\lambda_1(t)$ and $\lambda_2(t)$, whose function values are
+% correlated with correlation $\rho$ until a point $t_c$, after which
+% time the function values become uncorrelated.  We will write the input
+% domain here as $\cm{X} \deq \lbrace 1, 2 \rbrace \times \R$, where the
+% first discrete coordinate identifies which of the two functions an
+% observation is associated with.  We can then model this situation with
+% the covariance
+% \begin{equation}
+%   \label{correlation}
+%   K_{\textsc{CC}}\bigl( [t, \ell], [t', \ell'] ; \omega, \sigma, \rho, t_c \bigr)
+%   \deq
+%   \begin{cases}
+%     \phantom{\rho}K(t, t'; \omega, \sigma) 
+%     & \ell = 1, \ell' = 1; \\
+%     \rho K(t, t'; \omega, \sigma) 
+%     & \ell = 1, \ell' = 2, t' < t_c; \\
+%     \rho K(t, t'; \omega, \sigma) 
+%     & \ell = 2, \ell' = 1, t < t_c; \\
+%     \phantom{\rho}K(t, t'; \omega, \sigma) 
+%     & \ell = 2, \ell' = 2, t < t_c, t' < t_c; \\
+%     \phantom{\rho}K(t, t'; \omega, \sigma) 
+%     & \ell = 2, \ell' = 2, t \geq t_c, t' \geq t_c; \\
+%     \phantom{\rho}0 & \text{otherwise.}
+%   \end{cases}
+% \end{equation}
+% Notice that $\lambda_2$ is forced to have a break in correlation with
+% itself across the changepoint boundary.  This is required by the
+% assumptions of the model---if $\lambda_1$ and $\lambda_2$ are to be
+% uncorrelated with each other after $t_c$, they cannot both remain
+% correlated with themselves (and therefore each other) across the
+% boundary.  This asymmetry in the model should be addressed when
+% modeling such behavior.
 
-Let us suppose now that we have two functions of interest,
-$\lambda_1(t)$ and $\lambda_2(t)$, whose function values are
-correlated with correlation $\rho$ until a point $t_c$, after which
-time the function values become uncorrelated.  We will write the input
-domain here as $\cm{X} \deq \lbrace 1, 2 \rbrace \times \R$, where the
-first discrete coordinate identifies which of the two functions an
-observation is associated with.  We can then model this situation with
-the covariance
-\begin{equation}
-  \label{correlation}
-  K_{\textsc{CC}}\bigl( [t, \ell], [t', \ell'] ; \omega, \sigma, \rho, t_c \bigr)
-  \deq
-  \begin{cases}
-    \phantom{\rho}K(t, t'; \omega, \sigma) 
-    & \ell = 1, \ell' = 1; \\
-    \rho K(t, t'; \omega, \sigma) 
-    & \ell = 1, \ell' = 2, t' < t_c; \\
-    \rho K(t, t'; \omega, \sigma) 
-    & \ell = 2, \ell' = 1, t < t_c; \\
-    \phantom{\rho}K(t, t'; \omega, \sigma) 
-    & \ell = 2, \ell' = 2, t < t_c, t' < t_c; \\
-    \phantom{\rho}K(t, t'; \omega, \sigma) 
-    & \ell = 2, \ell' = 2, t \geq t_c, t' \geq t_c; \\
-    \phantom{\rho}0 & \text{otherwise.}
-  \end{cases}
-\end{equation}
-Notice that $\lambda_2$ is forced to have a break in correlation with
-itself across the changepoint boundary.  This is required by the
-assumptions of the model---if $\lambda_1$ and $\lambda_2$ are to be
-uncorrelated with each other after $t_c$, they cannot both remain
-correlated with themselves (and therefore each other) across the
-boundary.  This asymmetry in the model should be addressed when
-modeling such behavior.
+We often encounter multiple, correlated functions of time. Here we consider the case in which we have only a small number of such functions, leading us to choose the generic Gaussian process approach of \citet{osborne2008towards} amongst the many others developed \citep{boyle2005multiple, alvarez2011computationally}. This approach models the covariance between functions labelled by $\ell$ as the product
+$$
+K([t,\ell],[t',\ell']) = K_t(t,t')\,K_\ell(\ell,\ell')
+$$
+where $K_l$ is a square matrix of size equal to the number of series expressing the correlations between each. It can be parametrized by the spherical decomposition \citep{PinheiroBates},
+$$
+K_\ell= \diag(\mathbb{\lambda}) S \diag(\mathbb{\lambda}),
+$$
+where $\mathbb{\lambda}$ is a vector of output scales for each function, and the positive definite matrix $S$ allows for the representation of any correlation possible under this choice of covariance.
+
+Now consider that the correlation between functions experiences a changepoint at some particular time. This can be modelled by simply introducing new labelled functions within the same framework. Each function is split by a changepoint; the values before and after it are treated as separate functions with arbitrary correlations amongst them. Explicitly, imagine we have two functions, $a$ and $b$, separated by a changepoint, giving $a_1$ and $a_2$ for the two parts of $a$ and likewise $b_1$ and $b_2$ of $b$. If we label the parts $a_1$, $a_2$, $b_1$ and $b_2$ by $\ell = 1,2,3$ and $4$, the most general form of $S$ possible is
+$$
+S = \begin{pmatrix}
+1 & c_1 & c_2 & c_4 \\
+c_1 & 1 & c_1 c_2+c_3 s_1 s_2 & c_1 c_4 + c_5 s_1 s_4 \\
+c_2 & c_1 c_2 + c_1 s_1 s_2 & 1 & c_3 c_4 + s_2 s_4 (c_3 c_5 + c_6 s_3 s_5) \\
+c_4 & c_1 c_4 + c_5 s_1 s_4 & c_3 c_4 + s_2 s_4 (c_3 c_5 + c_6 s_3 s_5) & 1 \\
+\end{pmatrix}
+$$
+where $c_i$ and $s_i$ are shorthands for $\cos \theta_i$ and $\sin \theta_i$, respectively. Here $\theta_i\in \R$ is a correlation angle; the fact that it is real-valued eases our later inference. Here the correlation between $a$ and $b$ is $c_2$ before the changepoint, this becomes $c_1 c_4 + c_5 s_1 s_4$ after it. This change might also necessitate  a non-unity correlation between the values of $a$ before and after the changepoint, and similarly for $b$. A more restricted version with only three parameters,
+$$
+S = \begin{pmatrix}
+1 & 1 & c_2 & c_4 \\
+1 & 1 & c_2 & c_4 \\
+c_2 & c_2 & 1 & c_3 c_4 + s_2 s_4 c_3 \\
+c_4 & c_4 & c_3 c_4 + s_2 s_4 c_3 & 1 \\
+\end{pmatrix}
+$$
+enforces the constraint that the values of $a$ immediately before and immediately after the changepoint must be perfectly correlated.
+
 
 The covariance $K_{\text{CC}}$ is demonstrated in Figure
 \ref{fig:changecorrelation}.
