@@ -374,7 +374,7 @@ modeled via appropriately constructed covariance functions
 experiments below; however, the previous references may be consulted
 for more examples and information.
 
-\subsection{A sudden change in output scale}
+\subsection{A change in output scale}
 
 Suppose an intensity function is suspected of having undergone a
 sudden change in output scale at time $t_c$.  Let $\omega_1$ and
@@ -427,7 +427,27 @@ The covariance $K_{\text{CO}}$ is demonstrated in Figure
   \label{fig:changeoutput}
 \end{figure}
 
-\subsection{A sudden change in input scale}
+A smooth change in output scale can be trivially achieved with an appropriate modification to $a$, as
+
+\begin{equation*}
+  %\label{smoothoutchange}
+  a(t; \omega_1, \omega_2, t_c, \Delta) 
+  \deq
+  \begin{cases}
+    \omega_1 & t < t_c - \Delta; \\
+\omega_1 +\omega_2 \,s(\frac{t-t_c}{\Delta})
+ & t_c - \Delta \leq t < t_c + \Delta; \\
+    \omega_2 & t_c + \Delta \leq t.
+  \end{cases}
+\end{equation*}
+Here $s$ is a smooth, infinitely differentiable, function for which $s(-1)=0$ and $s(1) = 1$, obtained by integrating a bump function,
+\begin{equation}
+ \label{eq:smooth_fn}
+s(t) = \frac{\int_{-1}^t \exp( -\frac{1}{1 - x^2} ) \intd{x}}
+{\int_{-1}^1 \exp( -\frac{1}{1 - x^2} ) \intd{x}}.
+\end{equation}
+
+\subsection{A change in input scale}
 
 Suppose an intensity function is suspected of having undergone a
 sudden change in input scale at time $t_c$.  Let $\sigma_1$ and
@@ -476,6 +496,35 @@ The covariance $K_{\text{CI}}$ is demonstrated in Figure
     with $K_{\text{SE}}(4, t)$ for reference.  }
   \label{fig:changeinput}
 \end{figure}
+
+A smooth change in input scale can be achieved by modifying $u$, as
+$$
+  u(t; \sigma_1, \sigma_2, t_c, \Delta) \deq
+\begin{cases}
+    \frac{t}{\sigma_1} 
+& t < t_c - \Delta; \\
+\frac{t_c- \Delta}{\sigma_1} + \int_{t_c - \Delta}^{t} (\sigma_1 +\sigma_2 \,s(\frac{x-t_c}{\Delta}))^{-1} \intd{x}
+& t_c - \Delta \leq t < t_c + \Delta; \\
+    \frac{t_c- \Delta}{\sigma_1} + \int_{t_c - \Delta}^{t_c + \Delta} (\sigma_1 +\sigma_2 \,s(\frac{x-t_c}{\Delta}))^{-1} \intd{x} +  \frac{t - t_c}{\sigma_2} 
+& t_c + \Delta \leq t.
+\end{cases},
+$$
+where $s$ is the smooth function of \eqref{eq:smooth_fn}. 
+
+% Hence we have the covariance function
+% $$
+%   K_{\text{CI}}(t, t'; \omega, \sigma_1, \sigma_2, t_c, \Delta)
+%   =
+% \begin{cases}
+%  K(x,x', w_a) & 
+% x, x' < x_a\\
+% K(x,x', w_b); x, x' > x_b
+% h^2 k( |x-x_a|/w_a + int_{x_a}^{x_b} 1/w(x) dx + |x'-x_b|/w_b ); x <
+% x_a, x' > x_b
+% h^2 k( |x-x_a|/w_a + int_{x_a}^{x'} 1/w(x) dx ); x < x_a, x_a < x' < x_b
+% h^2 k( int_{x}^{x'} 1/w(x) dx ); x_a < x < x' < x_b
+% \end{cases}
+% $$
 
 \subsection{A sudden change in correlation}
 % 
