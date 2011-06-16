@@ -1,0 +1,750 @@
+\documentclass{article}
+\usepackage{nips11submit_e, times}
+
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{usbib}
+\usepackage{nicefrac}
+\usepackage{url}
+\usepackage{auto-pst-pdf}
+\usepackage{psfrag}
+
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{slantsc}
+\let\scitdefault\scsldefault
+
+\usepackage[algoruled]{algorithm2e}
+\SetCommentSty{\normalfont}
+\linesnotnumbered 
+\dontprintsemicolon
+
+\bibliographystyle{myusmeg-a}
+\renewcommand{\citenamefont}[1]{\textsc{\MakeLowercase{#1}}}
+\renewcommand{\bibnamefont}[1]{\textsc{#1}}
+\renewcommand*{\bibname}{biblography}
+
+\newcommand{\bm}[1]{\mathbf{#1}}
+\newcommand{\cm}[1]{\mathcal{#1}}
+\newcommand{\data}{\cm{D}}
+\newcommand{\given}{\mid}
+\newcommand{\intd}[1]{\,\mathrm{d}#1}
+\newcommand{\deq}{\triangleq}
+\newcommand{\R}{\mathbb{R}}
+
+\newcommand{\psff}[1]{\input{#1.tex}\includegraphics{#1.eps}}
+
+\DeclareMathOperator{\diag}{diag}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+\title{The generalized Battleship problem}
+\author{
+  Roman Garnett, Yamuna Krishnamurthy, Donghan Wang, Jeff Schneider\\
+  Carnegie Mellon University\\
+  5000 Forbes Avenue\\
+  Pittsburgh, Pennsylvania 15213\\
+  \texttt{\{rgarnett, ykrishna, dwang, jschneider\}\\@andrew.cmu.edu}
+  \And
+  Richard Mann\\
+  Uppsala Universitet\\
+  Uppsala 751\,06\\
+  Sweden\\
+  \texttt{rmann@math.uu.se}
+}
+
+\maketitle
+
+\begin{abstract}
+  In many classification problems, including numerous examples on
+  modern large-scale graph datasets, a large quantity of unlabeled
+  data are available. The cost of obtaining a label, however, can be
+  very expensive, for example when human intervention is required.
+  Both the semi-supervised and active learning communities have
+  approached such problems---the former focuses on aiding the
+  classification task by exploiting the distribution of unlabeled
+  data, and the latter addresses the problem of requesting the most
+  useful labels to minimize the cost spent pursuing the learning goal.
+  Here we focus on a specific active binary-classification problem,
+  where the goal is to find the members of a particular class as
+  quickly as possible.  In some situations, such as fraud detection or
+  the investigative analysis of criminal social networks, only the
+  members of the malicious class are sought, whereas obtaining labels
+  for points in the benign class is only useful for the purpose of
+  facilitating that task.  We derive the Bayesian optimal policy for
+  this decision problem, as well as myopic approximations for this
+  policy, and test our proposed algorithm on two large-scale graph
+  datasets.  The optimal policy can be implemented in parallel, and it
+  is our hope that the described algorithm can scale to even larger
+  problems.
+\end{abstract}
+
+\section{Introduction}
+
+In many real-world binary classification scenarios, it can be much
+easier to collect input data than it is to observe an associated
+label, which could require a relatively expensive human action.  For
+this reason, considerable research in semi-supervised and active
+learning has considered how to construct useful probabilistic models
+when unlabeled data are available, as well as how to solve the
+associated decision problem of determining which labels are the most
+useful to observe for the chosen learning objective.
+
+Active learning research has often focused on the problem of obtaining
+those labels that will improve overall classification accuracy as much
+as possible.  Here, we consider a different problem, where the members
+of one particular class are deemed critical and are to be located as
+quickly as possible.  An example application of this sort is locating
+malicious actors in a social or computer network, where finding the
+interesting points is more important than secondary measures such as
+classification accuracy.  We call this problem the \emph{generalized
+  Battleship} problem, in reference to the well-known board game,
+which has gameplay that takes the same form.
+
+We will treat this problem in the context of Bayesian decision theory
+and derive the Bayesian optimal policy for an appropriate utility
+function.  The decision analysis does not depend on the nature of the
+underlying classification problem; in particular, the input space and
+associated probabilistic model are not constrained.  In this
+manuscript, however, we will highlight graph learning as an
+application, where problems such as link prediction in social networks
+could be potential applications.
+
+The rest of this paper is arranged as follows.  In Sections
+\ref{problem} and \ref{related}, we formally describe the generalized
+Battleship problem and related work.  In Section \ref{optimal}, we
+provide the Bayesian optimal policy for this problem and analyze its
+complexity.  Finally, we will present the results of evaluating our
+algorithm on two large real-world graph datasets.
+
+\section{Problem Definition}
+\label{problem}
+
+Suppose we have a finite set of elements $\cm{X} \deq \lbrace x_i
+\rbrace$ and a subset $\cm{R} \subset\cm{X}$, the members of which we
+will call \emph{targets.}  We consider the following problem.  Suppose
+we do not know which members of $\cm{X}$ are targets \emph{a priori},
+but can successively request the binary $\lbrace 0, 1 \rbrace$
+response to questions of the form ``is $x$ in $\cm{R}$?'' for
+arbitrarily selected elements $x$. We wish to actively select a
+sequence of queries $\lbrace q_1, q_2, \dotsc \rbrace$ with the goal
+of maximizing the number of positive responses.  This quantity will
+serve the role of our utility function.
+
+We will approach this task using Bayesian decision theory.  This will
+require selecting a classification model that provides the posterior
+probability of a point $x$ belonging to $\cm{R}$ conditioned on
+previously observed data $\data$, $p(x \in \cm{R} \given x, \data)$.
+It will be mathematically convenient for us to define this problem
+equivalently in terms of a binary class label $y$, which we will
+define to be the value of the characteristic function $\chi(x \in
+\cm{R})$.  In the applications we consider, there will often be a
+notion that members of $\cm{R}$ should cluster together under some
+measure of similarity on $\cm{X}$, which will influence the choice of
+this probabilistic model. 
+
+An atypical real-world problem that could be treated under this
+framework is the Milton Bradley board game ``Battleship,'' where two
+players alternate firing ``shots'' to determine the presence of a
+``ship'' in an identified point of a $10 \times 10$ lattice.  Before
+the game begins, each player places five ships on their board, hidden
+from the other player, each of which occupies two-to-five contiguous
+points on the lattice.  In this case, $\cm{X} = [10] \times [10]$,
+$\cm{R}$ identifies the \emph{a priori} unknown locations of the
+opponent's ships, and keen players evaluate their beliefs about ship
+placement before deciding the locations of their shots.
+
+\section{Related Work}
+\label{related}
+
+Active learning is a mature field with a large associated body of
+literature \citep{activesurvey}.  The basic premise of active learning
+is that if the cost of obtaining a label is very high, then we can
+hope to achieve our learning objective with less overall cost by
+taking control of the labeling process.  Typically, in the active
+binary-classification problem, the chosen learning objective is
+related to properties of the associated probabilistic model.  Two
+examples include generalization error \citep{zhuactivesemi} and
+optimality criteria related to the Fisher information, for example,
+\textsc{a}-optimality \citep{activelogistic}.  One of the simplest
+active learning techniques for binary classification is
+\emph{uncertainty sampling} \citep{uncertaintysampling}, where at any
+given point, the algorithm requests the label for the point $x^\ast$
+with the greatest posterior uncertainty:
+\begin{equation*}
+  x^\ast 
+  \deq 
+  \argmin_x 
+  \bigl\lvert 
+  p(y = 1 \given x, \data) - \nicefrac{1}{2}
+  \bigr\rvert.
+\end{equation*}
+
+An intimately related problem to active learning is semi-supervised
+learning \citep{semisurvey}, which studies how to use the distribution
+of unlabeled data to improve model accuracy.  This is often a critical
+problem in active learning due to the high cost of labeling and the
+consequent abundance of unlabeled data.
+
+The game of Battleship itself has been subjected to some research as
+well.  In \citep{solving}, integer programming models were described
+to solve static logic puzzles based on the game.  It has been also
+shown that a particular decision problem\footnote{Here ``decision
+  problem'' is used in the context of computational complexity.}
+related to the game is \textsc{np}-complete \citep{battleshipnp}.
+
+The objective considered in this paper, locating members of an
+identified class, is unusual as far as the authors know.  A similar
+problem that has been considered is the active discovery of examples
+of previously unseen classes \citep{rareclass}.  Additionally, it has
+been noted that standard active learning techniques can help uncover
+relatively balanced training sets, even with significant imbalance
+between class proportion in the data \citep{activeimbalanced}.  This
+result suggests that there is promise in active approaches to the
+problem we consider, because previously described techniques can
+already help to uncover more members of a designated class (targets)
+than would be found by random search.  However, our experimental
+results show that the formal treatment of the exact problem defined
+here performs considerably better than uncertainty sampling.
+
+Here, we will eschew any direct consideration of classification or
+model accuracy completely and instead measure the success of our
+choice of queries based purely on our outlined goal: the overall
+number of targets uncovered by our search.  Of course, accurate models
+can facilitate that search, and a natural consequence of our setup is
+that the optimal policy will indeed dictate exploring regions with
+high uncertainty as needed.
+
+\section{The Optimal Bayesian Policy}
+\label{optimal}
+
+As stated above, we will analyze the generalized Battleship problem
+from the perspective of Bayesian decision theory and will derive the
+optimal policy.  We begin by defining an appropriate utility function
+that captures the ultimate goal of the problem.
+
+Define the utility of a set of observations $\data \triangleq
+\bigl\lbrace (x_i, y_i) \bigr\rbrace$ to be the number of inputs $x_i$
+seen with associated class label $y_i$ equal to 1 (equivalently, the
+number of targets found, $\lbrace x_i \rbrace \cap \cm{R}$):
+\begin{equation*}
+  u(x_1, x_2, \dotsc, y_1, y_2, \dotsc) \triangleq
+  \sum_i y_i.
+\end{equation*}
+This simple expression naturally captures the spirit of the problem
+as defined above.
+
+Without loss of generality, we will assume that at the onset we will
+only be allowed a fixed number of shots $t$. In applications where the
+cost of obtaining a label is high, it is the total cost of the queries
+that limits their number, rather than the quantity of unlabeled
+points.
+
+We now derive the policy for successively deciding the locations of
+our queries.  We begin by considering the case when we are allowed to
+make exactly one more query and will then address the general case.
+
+Suppose that we have already made $t-1$ observations $\data_{t-1}$.
+To select the location of our final observation $x_t$, we calculate
+the expected utility of a candidate point $x_t$, marginalizing out the
+unknown value of $y_t$:
+\begin{align*}
+  \mathbb{E}
+  \bigl[
+    u(x_t, y_t, \data_{t-1}) \given x_t, \data_{t-1} 
+  \bigr]
+  &=
+  \sum_{y_t \in \lbrace 0, 1 \rbrace} u(x_t, y_t, \data_{t-1}) p(y_t \given x_t, \data_{t-1})
+  \\
+  &=
+  u(\data_{t-1}) + p(y_t = 1 \given x_t, \data_{t-1});
+\end{align*}
+the optimal decision $x_t^\ast$ is therefore simply the point with the
+highest posterior probability of being a target:
+\begin{equation}\label{onestep}
+  x_t^\ast 
+  \triangleq 
+  \argmax_{x \notin \data_{t-1}} 
+  p(y = 1\given x, \data_{t-1}).
+\end{equation}
+This fact makes intuitive sense: when we have only one query
+remaining, there is no point in considering any potential future
+strategic value in its location; rather, we are compelled to greedily
+seek one final target.
+
+Given the optimal policy for selecting $x_t$, we now consider the
+problem of choosing the location of the second-to-last point
+$x_{t-1}$.  While making our decision in this case (as well as with
+any other $x_i$ with $i < t$), the problem becomes more difficult
+because we must now contemplate the possible consequences of our
+choices and how they will impact our future decisions. The mechanical
+manifestation of this remark is that during the calculation of the
+expected utility for the two-step-lookahead case, we must integrate
+out the unknown location of the final observation $x_t$, as well as
+its label:
+\begin{align}\label{twostep}
+  \mathbb{E}\bigl[
+    u(x_{t-1}, &y_{t-1}, x_t, y_t, \data_{t-2}) 
+    \given x_{t-1}, \data_{t-2}
+  \bigr]
+  {}
+  \nonumber
+  \\
+  &
+  \mspace{-25mu}
+  =
+  u(\data_{t-2}) 
+  + 
+  \int 
+  u(x_{t-1}, y_{t-1}, x_t, y_t)
+  p(y_{t-1} \given x_{t-1}, \data_{t-2})
+  \times
+  {}
+  \nonumber
+  \\
+  &
+  \mspace{225mu}
+  {}
+  \times
+  p(x_t \given \data_{t-1})
+  p(y_t \given x_t, \data_{t-1})
+  \intd{y_{t-1}} 
+  \intd{x_t} 
+  \intd{y_t}
+  \nonumber
+  \\
+  &
+  \mspace{-25mu}
+  =
+  u(\data_{t-2})
+  +
+  2
+  p(y_t^\ast = 1 \given x_t^\ast, y_{t-1} = 1, \data_{t-1})
+  p(y_{t-1} = 1 \given x_{t-1}, \data_{t-2})
+  \nonumber
+  \\
+  &
+  {}
+  \mspace{-25mu}
+  \phantom{{} = u(\data_{t-2})}
+  +
+  \phantom{2}
+  p(y_t^\ast = 0 \given x_t^\ast, y_{t-1} = 1, \data_{t-1})
+  p(y_{t-1} = 1 \given x_{t-1}, \data_{t-2})
+  \nonumber
+  \\
+  &
+  {}
+  \mspace{-25mu}
+  \phantom{{} = u(\data_{t-2})}
+  +
+  \phantom{2}
+  p(y_t^\ast = 1 \given x_t^\ast, y_{t-1} = 0, \data_{t-1})
+  p(y_{t-1} = 0 \given x_{t-1}, \data_{t-2})
+  \nonumber
+  \\
+  &
+  \mspace{-25mu}
+  =
+  u(\data_{t-2})
+  +
+  \Bigl(
+    \mathbb{E}
+    \bigl[
+      u(x_t^\ast, y_t^\ast, \data_{t-1}) \given y_{t-1} = 1, \data_{t-1}
+    \bigr] 
+    + 1
+  \Bigr)
+  p(y_{t-1} = 1 \given x_{t-1}, \data_{t-2})
+  \nonumber
+  \\
+  &
+  \mspace{62mu}
+  +
+  \phantom{\Bigl(}
+  \mathbb{E}
+  \bigl[
+    u(x_t^\ast, y_t^\ast, \data_{t-1}) \given y_{t-1} = 0, \data_{t-1} 
+  \bigr]
+  p(y_{t-1} = 0 \given x_{t-1}, \data_{t-2}),
+\end{align}
+where the integral over $x_t$ was evaluated trivially because $p(x_t
+\given \data_{t-1})$ is simply $\delta(x_t -
+x_t^\ast)$,\footnote{Notice that the value of $x_t^\ast$ depends on
+  the data $\data_{t-1}$, including the unknown value of $y_{t-1}$; it
+  might differ as a function of that conditioning.} where $\delta$
+is the Dirac delta function.
+
+To evaluate the two-step expected utility at a point $x_{t-1}$, we
+therefore sample over the unknown value $y_{t-1} \in \lbrace 0, 1
+\rbrace$; for each possible value of $y_{t-1}$, we find the optimal
+last observation $x_t^\ast$ given that fictitious observation as
+described above.  There are four possibilities for the possible
+realizations of $(y_{t-1}, y_t^\ast)$.  Two of these increase our
+current utility by one, and one increases the utility by two, giving
+rise to \eqref{twostep}. Note that sampling over $y_t^\ast$ is not
+required, because the expected utility in the one-step case has
+already been evaluated.  Of course, to select $x_{t-1}$, we again
+choose the currently unlabeled point with the highest expected
+utility.
+
+To handle $x_{i}$ for $i < (t - 1)$, we simply repeat the procedure
+described above recursively.  Pseudocode for the procedure with any
+number of remaining shots is shown in Algorithm \ref{lookahead}.
+
+\begin{algorithm}
+  
+  \SetKwData{utility}{utility}
+  \SetKwFunction{findoptimalaction}{{\normalfont \textsc{find-optimal-action}}}
+  \SetKwInOut{input}{input}
+  \SetKwInOut{output}{output}
+
+  \input{data $\data \deq (\bf{x}, \bf{y})$, 
+    allowed number of shots $\ell$, 
+    model \hspace*{0.01em} $p(y = 1 \given x,\data)$} 
+  \output{the Bayesian optimal action 
+    $x^\ast \in \cm{X} \setminus \bf{x}$}
+
+  \BlankLine
+
+  \eIf{$\ell = 1$} {
+    $x^\ast \leftarrow 
+    \displaystyle 
+    \max_{x \in \cm{X} \setminus \data} 
+    p(y = 1 \given x, \data)$ \;
+    \BlankLine
+    \Return $x^\ast$ \;
+  }{
+    \For{$x \in \cm{X} \setminus \bf{x}$} {
+      \utility{$x$} ${} \leftarrow 0$ \;
+      \For{$y \in \lbrace 0, 1 \rbrace$} {
+        \utility{$x$} ${} \leftarrow$ 
+        \utility{$x$} ${} + y + {}$ 
+        \findoptimalaction{
+          $\data \cup \lbrace x, y \rbrace$, $\ell - 1$\,
+        } \;
+      }
+    }
+  }
+  \BlankLine
+  $x^\ast \leftarrow 
+  \displaystyle 
+  \max_{x \in \cm{X} \setminus \data}$ \utility{$x$}\;
+  \BlankLine
+  \Return $x^\ast$ \;
+  
+  \caption{Function \textsc{find-optimal-action} \label{lookahead}}
+\end{algorithm}
+
+%\subsection{Running Time}
+%\label{runningtime}
+
+The running time of Algorithm \ref{lookahead} may be calculated
+directly.  Suppose there are $n$ points to choose from at time $t -
+\ell$.  Without any heuristics, performing exact $\ell$-step lookahead
+requires considering all of the
+\begin{equation*}
+  \prod_{i = 0}^{\ell-1} (n - i)
+\end{equation*}
+possible choices for the remaining $\ell$ points. For each of these
+choices we must also sample $2^{\ell - 1}$ possible observations of
+$y_{t-\ell + 1}, \dotsc y_{t-1}$, as well as incrementally condition
+the model based on $\ell - 1$ fictitious observations.  If that
+conditioning takes time $c$, then the total work required is
+\begin{equation*}
+  \frac{2^{\ell - 1} (\ell-1)c n!}{(n - \ell)!} 
+  = 
+  \cm{O}\bigl(c\ell(2n)^\ell\bigr).
+\end{equation*}
+For lookahead more than a few steps into the future, this procedure
+can become daunting due to the sampling required.  This is a common
+issue in fully optimal sequential Bayesian decision problems.
+
+One possible and common mechanism for addressing this problem is
+instead approximating exact inference by shortening our lookahead
+horizon \citep{ego, gpgo}.  For timestep $t - m$ with $m > \ell$, we
+may myopically pretend that there are in fact only $\ell$ observations
+remaining and choose $x_{t-m}$ by maximizing the $\ell$-step-lookahead
+expected utility.  In nontrivial applications, we can often expect
+that our uncertainty about the future will increase dramatically with
+the number of steps we look ahead. In this case, such a myopic
+approach should be a reasonable approximation to the optimal policy,
+because this large uncertainty results in little gain from
+marginalizing distant future decisions.  In Bayesian Gaussian process
+global optimization, a problem with a similar form, a one-step
+approximation is often used with great success \citep{ego}.  In
+\citep{gpgo}, the authors later described the optimal
+$\ell$-step-lookahead procedure and showed that two-step lookahead
+can outperform the one-step approximation.
+
+An alternative or potentially complementary approach is to restrict
+the search space as we look ahead.  For example, suppose that our
+model giving $p(y = 1\given x, \data)$ only considers those
+observations in $\data$ that are within the $k$-nearest neighbors of
+$x$ under some chosen similarity measure.  In this case, the work
+required to perform $\ell$-step lookahead reduces significantly.  For
+example, we may perform two-step lookahead by precomputing the
+expected utility for one-step lookahead at every point.  Now for a
+chosen candidate $x_{t-1}$, when sampling over $y_{t-1}$, we only need
+to condition the models for those points $x$ that contain $x_{t-1}$ as
+one of their nearest neighbors.  Finding $x_t^\ast$ given $y_{t-1}$
+requires much less work, because for $k \ll n$, most of the available
+choices will already have the required one-step lookahead utilities
+precomputed.  The average-case running time in this scenario now
+reduces to approximately $\cm{O}\bigl(c\ell(2k)^\ell\bigr),$ which is
+much more manageable and allows for increasing $\ell$ beyond what was
+feasible before.  Restricting to $k$-\textsc{nn} models also allows
+the algorithm to be easily parallelized and applied to very large
+datasets---the calculation of expected utilities is embarrassingly
+parallel, and restricting to local models makes each individual
+computation relatively fast.
+
+\section{Results}
+
+To evaluate the policy described in Section \ref{optimal}, we created
+two binary classification problems on real-world graphs.  In the
+applications we have envisioned, the target class will often be a
+small fraction of the overall dataset, and we kept this in mind during
+the creation of these experiments.
+
+\subsection{Implementation and setup}
+
+We implemented Algorithm \ref{lookahead} recursively in
+\textsc{matlab}.  For the classifier $p(y = 1 \given x, \data)$, we
+chose to use a simple $k$-nearest-neighbor classifier, where $k =
+200$.
+
+We chose to use the simple $k$-\textsc{nn} classifier for several
+reasons.  First, our goal in these experiments was to evaluate the
+decision algorithm presented above, and we did not want that
+evaluation to be confounded by any unrelated details of the
+classification mechanism.  Secondly, our desire is that the methods in
+this paper can scale to very large graphs, and $k$-\textsc{nn} models
+allow for easy parallelism, as well as cost savings as described
+above.  We also note that on some similar tasks, such as collaborative
+filtering, $k$-\textsc{nn} classifiers have achieved better success
+than more complex \textsc{svm} techniques \citep{knnvssvm}.  Indeed,
+in preliminary experiments on the datasets described below, several
+tested \textsc{svm}s performed worse than the $k$-\textsc{nn}
+algorithm used here.
+
+\subsection{CiteSeer\textsuperscript{\textbf{x}} data}
+
+For our first experiment, we created a graph from a subset of the
+CiteSeer\textsuperscript{x}\,citation network.  Papers in the database
+were grouped based on their venue of publication (after extensive data
+cleaning), and papers from the 48 venues with the most associated
+publications were retained.  The graph was defined by having these
+papers as its nodes (42\,133 in total) and directed citation
+relations as its edges.
+
+For this experiment, we designated all papers appearing in
+\textsc{nips} proceedings (2\,198 in total, 5.2\% of the dataset) as
+targets.  Locating these papers is a difficult task---among the top 10
+most-frequent venues in the dataset are the highly related venues
+\textsc{aaai}, \textsc{ijcai}, and \textsc{icml}, which together
+comprise 15.2\% of the dataset, and there are more venues related to
+machine learning in the remaining 38 as well.
+
+\subsubsection{Choosing the $k$-nearest neighbors}
+
+As mentioned previously, a natural assumption to make when
+constructing the classifier $p(y = 1 \given x, \data)$ is that the
+target class clusters together under some metric or similarity
+measure.  For this example, we follow the conclusions of many previous
+research efforts\footnote{Dozens of references may be found in the
+  impressively complete review by \citet{fousssigmoid}.} and use of
+similarity measures based on random walks, which have performed well
+both in our experiments and numerous other graph-learning problems
+such as collaborative filtering and web clustering
+\citep{fousssigmoid}.  In particular, we used the \textsc{granch}
+algorithm, which approximates the \emph{truncated commute time}
+between two nodes in a directed graph \citep{granch}.  The commute
+time is defined in terms of simple Markovian random walks on the graph
+and is described below.  \textsc{Granch} can be computed
+quickly enough to scale to very large graphs.\footnote{For a graph
+  with approximately $1.7 \times 10^5$ nodes and $2.8 \times 10^6$
+  edges, we were able to complete a query for the 200 nearest
+  neighbors to a node in the graph in 0.37\,s on a machine using a
+  single 2.3\,GHz \textsc{amd} Opteron processor core.}
+
+Let $v$ be an arbitrary node in a graph $G \deq (V, E)$.  Consider the
+following simple Markovian random walk on the edges of $E$.  At step
+$i = 0$, we begin at $v$.  We choose an outgoing edge $e$ incident to
+$v$ randomly with probability proportional to its weight and ``walk''
+to the other vertex incident with $e$.  At step $i = 1$, we take
+another step of the walk by repeating this procedure from the new
+vertex and repeat \emph{ad infinitum}.  It is clear that the edge
+weights induce a probability distribution on the set of infinite
+random walks from $v$, as well as those walks beginning from any other
+vertex.  Given a second node $v' \in V$, define the \emph{hitting
+  time} from $v$ to $v'$, $h(v, v')$ to be the expected time for a
+random walk from $v$ to enter $v'$ for the first time.  Given this, we
+may define a symmetrized measure called \emph{commute time}, $c(v,
+v')$, which is the expected number of steps a random walk from $v$
+takes to hit $v'$ and then return.  It is clear that $c(v, v') = h(v,
+v') + h(v', v)$.  Commute time is a metric on $V$, as is its square
+root \citep{fouss}.
+
+The truncated commute time constrains the length of random walks to be
+of a given finite length. \citet{granch} argue that not only does the
+truncation of random walks allow for computational feasibility, but
+also that it helps overcome occasional issues with commute time.  For
+example, when using standard full commute times, nodes with very large
+degree can be ``close'' to a node of interest, even if all paths to
+that node are relatively long.  This phenomenon has been noted
+recently and described in a theoretical context for random geometric
+graphs \citep{commutetimedegree}.  Truncating the walks helps to
+discourage this phenomenon.  For the experiments below, we set this
+truncation parameter $T$ to 10.
+
+\subsubsection{Experimental details}
+
+We ran 1\,000 steps of both the one-step- and two-step-lookahead
+versions of the algorithm presented above.  To facilitate computation,
+not every page was considered in the two-step algorithm; rather, we
+only calculated the two-step expected likelihood for a subset of the
+unlabeled pages.  This subset was chosen to include the unlabeled
+pages among the 200 nearest neighbors of the last 10 targets found,
+the pages with the last 10 targets found as nearest neighbors, and
+additionally a randomly selected subset of the remaining nodes
+(comprising 1\% of the remainder).\footnote{This modification was only
+  necessary because the \textsc{matlab} implementation was very
+  inefficient.}  This heuristically chosen subset was designed to
+attempt to enable both exploitation and exploration.  Although the
+Bayesian optimal action might not be found among these points, we hope
+that at least one point will be ``close enough'' to the optimal action
+in expected utility that the overall performance will not be
+dramatically impacted.
+
+We also compared our derived policy with a more typical active
+binary-classification algorithm (uncertainty sampling), where at each
+step, the point with the maximum uncertainty was queried.
+
+Each algorithm was initialized with the label of a single randomly
+selected \textsc{nips} paper (which was the same for each algorithm);
+all other papers were left unlabeled at the start of the experiment.
+
+At completion, the one-step algorithm had found 226 \textsc{nips}
+papers, the two-step algorithm had found 251, and the uncertainty
+sampling algorithm had found 206.  Random search would find an
+expected number of only 52 papers given the same number of shots.
+Figure \ref{citeseerresults} shows the cumulative number of targets
+found by each of the methods throughout the run of the experiment.
+
+\begin{figure}
+  \centering
+  \psff{fig}
+  \caption{Cumulative number of targets found during 1\,000 steps of
+    several active querying schemes on the CiteSeer\textsuperscript{x}
+    data.
+  }
+  \label{citeseerresults}
+\end{figure}
+
+These results support the effectiveness of Algorithm \ref{lookahead}.
+The two-step-lookahead procedure was able to find 11.4\% of the
+targets after scanning only 2.2\% of the data, five times better than
+would be expected by random search.  The two-step-lookahead policy
+also outperformed the greedy one-step policy by a significant margin.
+
+\subsection{Wikipedia data}
+
+We ran an additional experiment on a much larger dataset obtained from
+Wikipedia.  The input space was Wikipedia pages extracted from the
+Computer Science category, as well as all its subcategories.  In
+total, there were 171\,236 documents in this dataset.  Pages in the
+Programming Languages category or its subcategories (5\,422 in total,
+3.17\% of the dataset) were marked as targets.
+
+We repeated the same experiment described above for the
+CiteSeer\textsuperscript{x} data on this dataset, except we doubled
+the number of shots to 2\,000.  Out of these, the one-step lookahead
+procedure located 1\,783 targets.
+
+We interpret this result in two ways.  The impressive performance of
+the greedy one-step-lookahead procedure on this task implies that
+perhaps the chosen classification problem was too
+easy---programming-language pages might simply cluster together
+strongly.  On the other hand, we also note that \textsc{granch} was
+highly effective in identifying this cluster, empirically confirming
+our assertion that it is useful for this purpose. In light of these
+observations, we modified the problem setup to make it more difficult,
+while still providing a means of testing our search policy.  Rather
+than analyze the link graph of the Wikipedia pages, we used only their
+textual content for discriminating between classes.
+
+To approach this modified problem, we trained a latent Dirichlet
+analysis (\textsc{lda}) topic model from these documents using the
+\textsc{mallet} software package \citep{mallet}. The number of topics
+was set to 200.  The default parameters for \textsc{mallet} were used,
+except the hyperparameters of the \textsc{lda} model were optimized
+during the learning process.  Once the topic vector for each document
+was found, we measured the cosine similarity between these topic
+vectors and recorded the 200 most similar documents for each Wikipedia
+page, as well as the associated cosine similarities, which were used
+to weight the $k$-\textsc{nn} algorithm.
+
+We ran 2\,000 steps of the one-step and two-step optimal algorithm, as
+well as uncertainty sampling, given this problem setup. Each algorithm
+was initialized with the label of a single page in the Programming
+Language category (which was the same for each algorithm); all other
+pages were left unlabeled at the start of the experiment.
+
+Among the 2\,000 nodes selected for querying by the one-step-lookahead
+algorithm, 975 were in the Programming Languages category.  The
+two-step-lookahead algorithm found 990, and uncertainty sampling
+discovered 734. In contrast, random search would be expected to find
+only 63 targets with the same number of evaluations.  The
+two-step-lookahead algorithm was able to locate 18.2\% of the targets
+after querying only 1.17\% of the dataset.  These results again
+confirm the effectiveness of Algorithm \ref{lookahead}.
+
+\subsection{Discussion}
+
+In light of these results, we make an observation on the nature of the
+three algorithms tested.  First, both the relatively good quality of
+uncertainty sampling, as well as its relative inferiority to the
+algorithm described above, can be explained by its slightly different
+goal.  Querying the point with the maximum uncertainty causes the
+classification boundary to be explored.  Although this finds many
+targets (because they lie on the boundary just as often as the
+others), the different utility function driving the standard algorithm
+causes it to also query nodes less likely to be targets more often.
+
+In a sense then, uncertainty sampling is a purely explorative
+approach.  The one-step optimal policy, on the other hand, is a greedy
+and purely exploitative approach, and it is not surprising that it
+performs better than uncertainty sampling.  We believe the increased
+performance of the two-step-lookahead policy is that by looking two
+(or more) steps into the future, the algorithm can consider the
+relative tradeoffs of exploration versus exploitation, which are two
+goals that must typically be simultaneously be satisfied in
+optimization procedures.
+
+\section{Conclusion and Future Work}
+
+We have introduced the problem we call ``generalized Battleship,''
+that creates the challenge of actively seeking out members of an
+identified class.  We defined a natural utility function and derived
+the Bayesian optimal policy for the associated decision problem.
+
+The policy presented was tested empirically on two real-world graph
+datasets and performed well in comparison to a common active learning
+technique for binary classification, and we believe this difference is
+due to the different goals of the two methods.
+
+In the future, we hope to investigate different approaches to the
+underlying classification mechanism, particularly for graphs.  It
+would also be interesting to investigate other approaches for
+increasing the depth of lookahead that can be considered by our
+method; for example, perhaps a branch-and-bound heuristic can be
+employed with success.
+
+\bibliography{battleship}
+
+\end{document}
