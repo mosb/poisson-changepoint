@@ -60,21 +60,21 @@
 \begin{abstract}
   In many classification problems, including numerous examples on
   modern large-scale graph datasets, a large quantity of unlabeled
-  data are available. However, the cost of obtaining a label can be
+  data are available. The cost of obtaining a label for such data can be
   very expensive, for example when human intervention is required.
   Both the semi-supervised and active learning communities have
   approached such problems.  The former focuses on how to aid the
   classification task by exploiting the distribution of unlabeled
   data, and the latter addresses the problem of proactively choosing
-  the most useful labels to request to minimize the cost spent in
-  pursuit of the learning goal.  Various algorithms have been proposed
-  by these communities that learn from a large dataset with few
-  labeled data, and graph data have in particular received a lot of
+  the most useful labels to acquire, that would subsequently minimize 
+  the cost incurred in the pursuit of the learning goal. Various algorithms
+  have been proposed by these communities that learn from a large dataset with few
+  labeled data, and graph datasets have in particular received a lot of
   attention for large-scale applications such as collaborative
   filtering for recommendation systems and link prediction in social
   networks.
 
-  Here we focus on a specific active binary-classification problem,
+  Here, we focus on a specific active binary-classification problem,
   where the goal is to find the members of a particular class as
   quickly as possible.  In some situations, such as fraud detection or
   the investigative analysis of potentially criminal social networks,
@@ -95,15 +95,14 @@
 
 Current real-world machine learning problems are often posed on large
 graphs, such as web graphs and other communication graphs, including
-social networks.  In this manuscript, we will consider the
-binary-classification task on graphs.  In many scenarios, it can be
-much easier to collect input data than it is to observe an associated
-label, which could require a relatively expensive human action.  For
-this reason, considerable research in semi-supervised and active
-learning has considered how to construct useful probabilistic models
-when unlabeled data are available, as well as how to solve the
-associated decision problem of determining which labels are the most
-useful to observe for the chosen learning objective.
+social networks.  In this manuscript, we will consider binary-classification 
+on graphs.  In many scenarios, it is much easier to collect input data than 
+it is to observe an associated label, which could require a relatively 
+expensive human action.  For this reason, considerable research in 
+semi-supervised and active learning has focused on how to construct 
+useful probabilistic models when unlabeled data are available, as well 
+as how to solve the associated decision problem of determining which labels
+are the most useful to observe for the chosen learning objective.
 
 Active learning research has often focused on the problem of obtaining
 those labels that will improve overall classification accuracy as much
@@ -125,7 +124,7 @@ manuscript, however, we will consider the problem from the point of
 view of graph learning.  We will briefly review and discuss how to
 construct useful models that can exploit the graph structure of a
 given dataset.  In particular, we discuss the computation and use of
-similarity measures between the nodes of the graph based on random
+similarity measures between the nodes of the graph, based on random
 walks.  We argue that measures based on the graph Laplacian, including
 commute time, truncated commute time, and in particular the
 \textsc{granch} algorithm can be useful in this context.
@@ -154,7 +153,8 @@ successively request the binary $\lbrace 0, 1 \rbrace$ response to
 questions of the form ``is $x$ in $\cm{T}$?'' for arbitrarily selected
 elements $x$. We wish to proactively select a sequence of queries
 $\lbrace q_1, q_2, \dotsc \rbrace$ with the goal of finding the
-elements of $\cm{T}$ as quickly as possible.
+elements of $\cm{T}$ as quickly as possible, that is, in the least number
+of queries.
 
 We will approach this task using Bayesian decision theory.  This will
 require selecting a classification model that provides the posterior
@@ -267,7 +267,7 @@ This simple expression naturally captures the spirit of the problem
 as defined above.
 
 Without loss of generality, we will assume that at the onset we will
-only be allowed a fixed number of shots $t$; note that by setting $t
+only be allowed a fixed number of queries $t$; note that by setting $t
 \deq n$, we recover the most-general problem.  In applications where
 the cost of obtaining a label is high, it is the total cost of the
 queries that limits their number, rather than the quantity of
@@ -485,8 +485,9 @@ choose the currently unlabeled point with the highest expected
 utility.
 
 To handle $x_{i}$ for $i < (t - 1)$, we simply repeat the procedure
-described above recursively.  Pseudocode for the full with any
-number of remaining shots is shown in Algorithm \ref{lookahead}.
+described above recursively. Pseudocode for the full $\ell$-step 
+lookahead procedure, with any number of remaining queries, is shown 
+in Algorithm \ref{lookahead}.
 
 \begin{algorithm}
   
@@ -708,7 +709,7 @@ thousands of nodes in $G$, although both \citep{fouss} and
 \citep{brand} propose computational schemes to aid the situation.
 Fouss, \emph{et al.}\ \citep{fouss} describe how to calculate a
 column of $\bm{L}^+$ ``on demand'' via a sparse Cholesky factorization
-of $\bm{L}$, and \citep{brand} proposes a iterative algorithm for
+of $\bm{L}$, and \citep{brand} proposes an iterative algorithm for
 finding commute times.
 
 Still another alternative is to perform a sparse singular value
@@ -780,7 +781,7 @@ mind during the creation of these experiments.
 
 We implemented Algorithm \ref{lookahead} recursively in
 \textsc{matlab}.  For the probabilistic model $p(y = 1 \given x,
-\data)$, we chose to use a simple $k$-nearest-neighbor classifier,
+\data)$, we chose to use a simple $k$-\textsc{nn} classifier,
 where $k = 200$.  The 200 nearest neighbors for each node in each
 graph were obtained by querying \textsc{granch} on the directed graph
 of interest.
@@ -794,7 +795,7 @@ this paper can scale to very large graphs, and $k$-\textsc{nn} models
 allow for easy parallelism, as well as cost savings as described in
 Section \ref{runningtime}.  We also note that on some similar tasks,
 such as collaborative filtering, $k$-\textsc{nn} classifiers have
-achieved better success that more complex \textsc{svm} techniques in
+achieved better success than more complex \textsc{svm} techniques in
 some experiments \citep{knnvssvm}.
 
 \subsection{CiteSeer\textsuperscript{\textbf{x}} Data}
